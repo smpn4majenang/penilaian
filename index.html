@@ -1,0 +1,326 @@
+Panduan: Frontend di GitHub & Backend di Google Apps ScriptDalam metode ini, Google Apps Script hanya berfungsi sebagai API (penerima data), sedangkan tampilan formulir (HTML) di-hosting secara gratis di GitHub Pages.BAGIAN 1: Backend (Google Apps Script)Kode ini bertugas menangkap kiriman data dari luar (GitHub) dan memilahnya ke spreadsheet yang sesuai.1. Kode Code.gsHapus semua kode lama di Code.gs, ganti dengan kode ini:/**
+ * KONFIGURASI GURU DAN ID SPREADSHEET<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input Nilai Siswa</title>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <style>
+      .loader {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 1s linear infinite;
+        display: none;
+        margin: 0 auto;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 py-10 px-4 font-sans">
+
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6">
+      <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Input Nilai Siswa</h2>
+
+      <!-- Form -->
+      <form id="formNilai">
+        
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Pilih Guru</label>
+          <select name="pilihGuru" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            <option value="" disabled selected>-- Pilih Guru --</option>
+            <!-- Value harus sama persis dengan kunci di Code.gs -->
+            <option value="Pak Budi">Pak Budi</option>
+            <option value="Bu Siti">Bu Siti</option>
+            <option value="Pak Joko">Pak Joko</option>
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Nama Siswa</label>
+          <input type="text" name="namaSiswa" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Kelas</label>
+          <input type="text" name="kelas" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Nilai</label>
+          <input type="number" name="nilai" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Keterangan</label>
+          <textarea name="keterangan" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+
+        <button type="submit" id="btnKirim" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition duration-300">
+          <span id="btnText">Kirim Data</span>
+          <div id="loading" class="loader"></div>
+        </button>
+
+        <p id="pesan" class="text-center mt-4 text-sm font-semibold"></p>
+      </form>
+    </div>
+
+    <script>
+      /**
+       * KONFIGURASI URL
+       * Tempel URL Web App dari Google Apps Script Deployment di bawah ini
+       */
+      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJBn2JQWKJ2zBlhPFqg_fWqnuAFI0-DGb3ukWA_HPDM7Kpg8HlKGtJXr_lJf0tWbJ1/exec";
+
+      const form = document.getElementById('formNilai');
+      const btn = document.getElementById('btnKirim');
+      const btnText = document.getElementById('btnText');
+      const loader = document.getElementById('loading');
+      const pesanDiv = document.getElementById('pesan');
+
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        
+        // UI Loading
+        btn.disabled = true;
+        btnText.style.display = 'none';
+        loader.style.display = 'block';
+        pesanDiv.textContent = '';
+
+        // Siapkan data
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        // Kirim menggunakan fetch API
+        // Catatan: Google Apps Script memerlukan 'no-cors' atau text/plain untuk post sederhana
+        // tapi untuk mendapatkan respon JSON, kita kirim sebagai text biasa (bukan application/json)
+        // agar tidak memicu preflight check browser (CORS).
+        
+        fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(data)
+          // Jangan tambahkan headers 'Content-Type': 'application/json' 
+          // Biarkan default (text/plain) agar tidak kena blokir CORS.
+        })
+        .then(response => response.json())
+        .then(result => {
+          // UI Selesai
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          loader.style.display = 'none';
+
+          if (result.status === 'sukses') {
+            pesanDiv.textContent = result.pesan;
+            pesanDiv.className = 'text-center mt-4 text-sm font-semibold text-green-600';
+            form.reset();
+          } else {
+            throw new Error(result.pesan);
+          }
+        })
+        .catch(error => {
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          loader.style.display = 'none';
+          pesanDiv.textContent = 'Gagal: ' + error.message;
+          pesanDiv.className = 'text-center mt-4 text-sm font-semibold text-red-600';
+        });
+      });
+    </script>
+</body>
+</html>
+ */
+const DATA_GURU = {
+  "Pak Budi": "MASUKKAN_ID_SPREADSHEET_PAK_BUDI_DISINI",
+  "Bu Siti": "MASUKKAN_ID_SPREADSHEET_BU_SITI_DISINI",
+  "Pak Joko": "MASUKKAN_ID_SPREADSHEET_PAK_JOKO_DISINI"
+};
+
+/**
+ * Fungsi ini menangani request POST dari form HTML di GitHub
+ */
+function doPost(e) {
+  // LockService mencegah tabrakan jika banyak siswa input bersamaan
+  const lock = LockService.getScriptLock();
+  lock.tryLock(10000);
+
+  try {
+    // 1. Ambil data JSON yang dikirim dari GitHub
+    // Kita anggap data dikirim sebagai string JSON di body request
+    const dataForm = JSON.parse(e.postData.contents);
+    const guru = dataForm.pilihGuru;
+
+    // 2. Cek Guru & ID Spreadsheet
+    if (!DATA_GURU[guru]) {
+      throw new Error("ID Spreadsheet untuk guru tersebut tidak ditemukan!");
+    }
+    const idSpreadsheet = DATA_GURU[guru];
+
+    // 3. Buka Spreadsheet & Sheet
+    const ss = SpreadsheetApp.openById(idSpreadsheet);
+    let sheet = ss.getSheetByName("Sheet1");
+    if (!sheet) {
+      sheet = ss.insertSheet("Sheet1");
+      sheet.appendRow(["Waktu", "Nama Siswa", "Kelas", "Nilai", "Keterangan"]);
+    }
+
+    // 4. Simpan Data
+    const waktu = new Date();
+    sheet.appendRow([
+      waktu,
+      dataForm.namaSiswa,
+      dataForm.kelas,
+      dataForm.nilai,
+      dataForm.keterangan
+    ]);
+
+    // 5. Kembalikan Response Sukses ke GitHub (JSON)
+    const result = { status: "sukses", pesan: "Data berhasil disimpan untuk " + guru };
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    // 6. Kembalikan Response Gagal
+    const result = { status: "gagal", pesan: error.toString() };
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } finally {
+    lock.releaseLock();
+  }
+}
+2. Deploy (PENTING)Langkah ini krusial agar GitHub bisa "berbicara" dengan Google Script.Klik tombol Deploy > New Deployment.Pilih type: Web App.Description: API Input Nilai.Execute as: Me (Saya).Who has access: Anyone (Siapa saja). WAJIB 'ANYONE' AGAR TIDAK ERROR CORS.Klik Deploy.Salin URL Web App yang muncul (berakhiran /exec). Simpan ini untuk langkah selanjutnya.BAGIAN 2: Frontend (GitHub Pages)Anda tidak perlu file Index.html di Google Apps Script lagi. Buat file index.html di komputer Anda atau langsung di repository GitHub.Kode index.html<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input Nilai Siswa</title>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <style>
+      .loader {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 1s linear infinite;
+        display: none;
+        margin: 0 auto;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 py-10 px-4 font-sans">
+
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6">
+      <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Input Nilai Siswa</h2>
+
+      <!-- Form -->
+      <form id="formNilai">
+        
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Pilih Guru</label>
+          <select name="pilihGuru" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            <option value="" disabled selected>-- Pilih Guru --</option>
+            <!-- Value harus sama persis dengan kunci di Code.gs -->
+            <option value="Pak Budi">Pak Budi</option>
+            <option value="Bu Siti">Bu Siti</option>
+            <option value="Pak Joko">Pak Joko</option>
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Nama Siswa</label>
+          <input type="text" name="namaSiswa" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Kelas</label>
+          <input type="text" name="kelas" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Nilai</label>
+          <input type="number" name="nilai" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-gray-700 text-sm font-bold mb-2">Keterangan</label>
+          <textarea name="keterangan" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+
+        <button type="submit" id="btnKirim" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition duration-300">
+          <span id="btnText">Kirim Data</span>
+          <div id="loading" class="loader"></div>
+        </button>
+
+        <p id="pesan" class="text-center mt-4 text-sm font-semibold"></p>
+      </form>
+    </div>
+
+    <script>
+      /**
+       * KONFIGURASI URL
+       * Tempel URL Web App dari Google Apps Script Deployment di bawah ini
+       */
+      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJBn2JQWKJ2zBlhPFqg_fWqnuAFI0-DGb3ukWA_HPDM7Kpg8HlKGtJXr_lJf0tWbJ1/exec";
+
+      const form = document.getElementById('formNilai');
+      const btn = document.getElementById('btnKirim');
+      const btnText = document.getElementById('btnText');
+      const loader = document.getElementById('loading');
+      const pesanDiv = document.getElementById('pesan');
+
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        
+        // UI Loading
+        btn.disabled = true;
+        btnText.style.display = 'none';
+        loader.style.display = 'block';
+        pesanDiv.textContent = '';
+
+        // Siapkan data
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        // Kirim menggunakan fetch API
+        // Catatan: Google Apps Script memerlukan 'no-cors' atau text/plain untuk post sederhana
+        // tapi untuk mendapatkan respon JSON, kita kirim sebagai text biasa (bukan application/json)
+        // agar tidak memicu preflight check browser (CORS).
+        
+        fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(data)
+          // Jangan tambahkan headers 'Content-Type': 'application/json' 
+          // Biarkan default (text/plain) agar tidak kena blokir CORS.
+        })
+        .then(response => response.json())
+        .then(result => {
+          // UI Selesai
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          loader.style.display = 'none';
+
+          if (result.status === 'sukses') {
+            pesanDiv.textContent = result.pesan;
+            pesanDiv.className = 'text-center mt-4 text-sm font-semibold text-green-600';
+            form.reset();
+          } else {
+            throw new Error(result.pesan);
+          }
+        })
+        .catch(error => {
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          loader.style.display = 'none';
+          pesanDiv.textContent = 'Gagal: ' + error.message;
+          pesanDiv.className = 'text-center mt-4 text-sm font-semibold text-red-600';
+        });
+      });
+    </script>
+</body>
+</html>
+Langkah Upload ke GitHubBuat Repository:Login ke GitHub, buat repository baru (misal: input-nilai-sekolah).Centang "Initialize with a README" atau biarkan kosong.Upload File:Klik Add file > Create new file.Beri nama index.html.Paste kode HTML di atas.JANGAN LUPA: Ganti SCRIPT_URL di bagian bawah kode dengan URL Web App Google Script Anda.Klik Commit changes.Aktifkan GitHub Pages:Buka tab Settings di repository tersebut.Pilih menu Pages di sidebar kiri.Di bagian Build and deployment > Source, pilih Deploy from a branch.Di bagian Branch, pilih main (atau master) dan folder / (root).Klik Save.Selesai:Tunggu 1-2 menit. GitHub akan memberikan link (misal: https://username.github.io/input-nilai-sekolah/).Buka link tersebut, formulir siap digunakan!
